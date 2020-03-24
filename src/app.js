@@ -31,7 +31,9 @@ function makeMarker(position) {
         const popup = new google.maps.InfoWindow({
           content: infoWindow
         });
-        popup.open(map, marker);
+        const onMarkerClick = () => popup.open(map, marker);
+        onMarkerClick();
+        marker.addListener('click', onMarkerClick);
         console.log(results);
         gatherLookup(address, (str) => infoWindow.innerHTML = `${address}<br />${str}`);
       }
@@ -46,6 +48,9 @@ function gatherLookup(addr, callback) {
     .then((response) => response.ok && response.json())
     .then((data) => {
       console.log('GATHER', data);
+      if (data.error) {
+        throw new Error(data.error);
+      }
 
       const phones = data.phones.length ?
         data.phones.reduce((str, phone) => {
@@ -76,7 +81,13 @@ function getGatherableAddress(place) {
     const city = getAddressComponent(place.address_components, 'locality', true);
     const state = getAddressComponent(place.address_components, 'administrative_area_level_1', true);
     if (num && street && city && state) {
-      return `${num} ${street}, ${city}, ${state}`;
+      const cleanedStreetName = street
+        .replace(/ [NEWS]$/, '')
+        .replace(/^East /, 'E ')
+        .replace(/^North /, 'N ')
+        .replace(/^South /, 'S ')
+        .replace(/^West /, 'W ')
+      return `${num} ${cleanedStreetName}, ${city}, ${state}`;
     }
   }
   return place.formatted_address;
