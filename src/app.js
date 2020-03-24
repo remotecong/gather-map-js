@@ -44,7 +44,7 @@ function makeMarker(position) {
 }
 
 function gatherLookup(addr, callback) {
-  return fetch(`http://localhost:7712/?address=${encodeURIComponent(addr)}`)
+  return fetch(`https://gather-api.dillonchristensen.com/?address=${encodeURIComponent(addr)}`)
     .then((response) => response.ok && response.json())
     .then((data) => {
       console.log('GATHER', data);
