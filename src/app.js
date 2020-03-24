@@ -26,17 +26,39 @@ function makeMarker(position) {
   geocode.geocode({location: position}, function(results, status) {
     if (status === 'OK') {
       if (results[0]) {
-        infoWindow.textContent = getGatherableAddress(results[0]);
+        let address = getGatherableAddress(results[0]);
+        infoWindow.innerHTML = address;
         const popup = new google.maps.InfoWindow({
           content: infoWindow
         });
         popup.open(map, marker);
         console.log(results);
+        gatherLookup(address, (str) => infoWindow.innerHTML = `${address}<br />${str}`);
       }
     }
   });
 
   return marker;
+}
+
+function gatherLookup(addr, callback) {
+  return fetch(`http://localhost:7712/?address=${encodeURIComponent(addr)}`)
+    .then((response) => response.ok && response.json())
+    .then((data) => {
+      console.log('GATHER', data);
+
+      const phones = data.phones.length ?
+        data.phones.reduce((str, phone) => {
+          return str + `<li title="${phone.isMobile ? 'Mobile' : 'Landline'}">${data.livesThere ? '' : phone.name + ' - '}${phone.number}</li>`;
+        }, '<ul>') + '</ul>' :
+        '<p>No phone numbers found</p>';
+
+      callback(`<p style="font-weight: bold;" title="${data.rawName}">${data.name}</p><p style="color:${data.livesThere ? 'green' : 'red'}">Does ${data.livesThere ? '' : 'not'} live here</p>${phones}`);
+    })
+    .catch((err) => {
+      console.error('GATHER ERR', err);
+      callback('FAILED TO LOOKUP! SEE LOGS');
+    });
 }
 
 
