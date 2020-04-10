@@ -2,15 +2,19 @@ const markers = [];
 let map, currentLocation, geocode;
 
 function initMap() {
-  map = new google.maps.Map(document.getElementById('map'), {
-    center: currentLocation || {lat: -34.397, lng: 150.644},
-    zoom: 14
-  });
+  map = new google.maps.Map(document.getElementById('map'), getMapState());
 
   geocode = new google.maps.Geocoder();
 
   map.addListener('click', function(e) {
     markers.push(makeMarker(e.latLng));
+  });
+
+  map.addListener('idle', function() {
+    saveMapState({
+      center: map.getCenter(),
+      zoom: map.getZoom(),
+    });
   });
 }
 
@@ -44,7 +48,7 @@ function makeMarker(position) {
 }
 
 function gatherLookup(addr, callback) {
-  return fetch(`https://gather-api.dillonchristensen.com/?address=${encodeURIComponent(addr)}`)
+  return fetch(`https://api.remotecong.com/?address=${encodeURIComponent(addr)}`)
     .then((response) => response.ok && response.json())
     .then((data) => {
       console.log('GATHER', data);
@@ -58,7 +62,7 @@ function gatherLookup(addr, callback) {
         }, '<ul>') + '</ul>' :
         '<p>No phone numbers found</p>';
 
-      callback(`<p style="font-weight: bold;" title="${data.rawName}">${data.name}</p><p style="color:${data.livesThere ? 'green' : 'red'}">Does ${data.livesThere ? '' : 'not'} live here</p>${phones}`);
+      callback(`<p style="font-weight: bold;" title="${data.ownerName}">${data.ownerName}</p><p style="color:${data.livesThere ? 'green' : 'red'}">Does ${data.livesThere ? '' : 'not'} live here</p>${phones}`);
     })
     .catch((err) => {
       console.error('GATHER ERR', err);
@@ -81,26 +85,25 @@ function getGatherableAddress(place) {
     const city = getAddressComponent(place.address_components, 'locality', true);
     const state = getAddressComponent(place.address_components, 'administrative_area_level_1', true);
     if (num && street && city && state) {
-      const cleanedStreetName = street
-        .replace(/ [NEWS]$/, '')
-        .replace(/^East /, 'E ')
-        .replace(/^North /, 'N ')
-        .replace(/^South /, 'S ')
-        .replace(/^West /, 'W ')
-      return `${num} ${cleanedStreetName}, ${city}, ${state}`;
+      return `${num} ${street}, ${city}, ${state}`;
     }
   }
   return place.formatted_address;
 }
 
-(function(geo) {
-  if (geo) {
-    geo.getCurrentPosition(function(pos) {
-      currentLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+const LAST_KNOWN_COORDS_KEY = 'last-known-coords';
 
-      if (map) {
-        map.setCenter(currentLocation);
-      }
-    });
+function saveMapState(coords) {
+  window.localStorage.setItem(LAST_KNOWN_COORDS_KEY, JSON.stringify(coords));
+}
+
+function getMapState() {
+  try {
+    const str = window.localStorage.getItem(LAST_KNOWN_COORDS_KEY);
+    if (str) {
+      return JSON.parse(str);
+    }
+  } catch(ignore) {
   }
-})(navigator.geolocation);
+  return {"center":{"lat":36.11311811576981,"lng":264.12948609197935},"zoom":12};
+}
