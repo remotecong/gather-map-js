@@ -31,7 +31,7 @@ function makeMarker(position) {
     if (status === 'OK') {
       if (results[0]) {
         let address = getGatherableAddress(results[0]);
-        infoWindow.innerHTML = address;
+        infoWindow.innerHTML = `${address}<br /><img style="width:40px;display:block;margin:auto;" src="/loading.gif" />`;
         const popup = new google.maps.InfoWindow({
           content: infoWindow
         });
