@@ -1,5 +1,8 @@
 const markers = [];
 let map, currentLocation, geocode;
+const apiUrl = /localhost/.test(window.location.href) ?
+  'http://localhost:7712' :
+  'https://api.remotecong.com';
 
 function initMap() {
   map = new google.maps.Map(document.getElementById('map'), getMapState());
@@ -38,7 +41,7 @@ function makeMarker(position) {
         const onMarkerClick = () => popup.open(map, marker);
         onMarkerClick();
         marker.addListener('click', onMarkerClick);
-        console.log(results);
+        console.log('GOOGLE GEOCODE:', results);
         gatherLookup(address, (str) => infoWindow.innerHTML = `${address}<br />${str}`);
       }
     }
@@ -47,25 +50,46 @@ function makeMarker(position) {
   return marker;
 }
 
+function getLastName(name) {
+  return name.replace(" or <em>Current Resident</em>", "").split(" ").pop();
+}
+
 function gatherLookup(addr, callback) {
-  return fetch(`https://api.remotecong.com/?address=${encodeURIComponent(addr)}`)
+  return fetch(`${apiUrl}/?address=${encodeURIComponent(addr)}`)
     .then((response) => response.ok && response.json())
     .then((data) => {
-      console.log('GATHER', data);
+      console.log('GATHER:', data);
       if (data.error) {
         throw new Error(data.error);
       }
 
-      const phones = data.phones.length ?
-        data.phones.reduce((str, phone) => {
-          return str + `<li title="${phone.isMobile ? 'Mobile' : 'Landline'}">${data.livesThere ? '' : phone.name + ' - '}${phone.number}</li>`;
+      const { phones, livesThere, ownerName } = data;
+
+      const name = livesThere ?
+        ownerName :
+        (phones.length ?
+          `${phones[0].name} or <em>Current Resident</em>` :
+          "Current Resident");
+
+      const lastName = getLastName(name);
+
+      const displayPhones = phones.filter(({ name }) => {
+        if (livesThere) {
+          return true;
+        }
+        return lastName === getLastName(name);
+      });
+
+      const html = displayPhones.length ?
+        displayPhones.reduce((str, phone) => {
+          return str + `<li title="${phone.isMobile ? 'Mobile' : 'Landline'}">${phone.number}</li>`;
         }, '<ul>') + '</ul>' :
         '<p>No phone numbers found</p>';
 
-      callback(`<p style="font-weight: bold;" title="${data.ownerName}">${data.ownerName}</p><p style="color:${data.livesThere ? 'green' : 'red'}">Does ${data.livesThere ? '' : 'not'} live here</p>${phones}`);
+      callback(`<p style="font-weight: bold;" title="${data.ownerName}">${name}</p>${html}`);
     })
     .catch((err) => {
-      console.error('GATHER ERR', err);
+      console.error('GATHER ERR:', err);
       callback('FAILED TO LOOKUP! SEE LOGS');
     });
 }
