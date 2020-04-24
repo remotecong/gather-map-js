@@ -41,7 +41,7 @@ function makeMarker(position) {
         const onMarkerClick = () => popup.open(map, marker);
         onMarkerClick();
         marker.addListener('click', onMarkerClick);
-        console.log(results);
+        console.log('GOOGLE GEOCODE:', results);
         gatherLookup(address, (str) => infoWindow.innerHTML = `${address}<br />${str}`);
       }
     }
@@ -51,14 +51,14 @@ function makeMarker(position) {
 }
 
 function getLastName(name) {
-  return name.split(" ").pop();
+  return name.replace(" or <em>Current Resident</em>", "").split(" ").pop();
 }
 
 function gatherLookup(addr, callback) {
   return fetch(`${apiUrl}/?address=${encodeURIComponent(addr)}`)
     .then((response) => response.ok && response.json())
     .then((data) => {
-      console.log('GATHER', data);
+      console.log('GATHER:', data);
       if (data.error) {
         throw new Error(data.error);
       }
@@ -68,8 +68,8 @@ function gatherLookup(addr, callback) {
       const name = livesThere ?
         ownerName :
         (phones.length ?
-          phones[0].name :
-          `${ownerName} or <em>Current Resident</em>`);
+          `${phones[0].name} or <em>Current Resident</em>` :
+          "Current Resident");
 
       const lastName = getLastName(name);
 
@@ -89,7 +89,7 @@ function gatherLookup(addr, callback) {
       callback(`<p style="font-weight: bold;" title="${data.ownerName}">${name}</p>${html}`);
     })
     .catch((err) => {
-      console.error('GATHER ERR', err);
+      console.error('GATHER ERR:', err);
       callback('FAILED TO LOOKUP! SEE LOGS');
     });
 }
