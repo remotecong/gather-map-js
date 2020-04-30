@@ -78,7 +78,7 @@ function gatherLookup(addr, callback) {
       const html = displayPhones.length ?
         displayPhones.reduce((str, phone) => {
           return str + `<li title="${phone.type}">${phone.number}</li>`;
-        }) :
+        }, '') :
         '<p>No phone numbers found</p>';
 
       callback(`<p style="font-weight: bold;">${name}</p>${html}`);
