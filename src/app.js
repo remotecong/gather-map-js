@@ -1,6 +1,9 @@
 const markers = [];
 let map, currentLocation, geocode;
-const apiUrl = /localhost/.test(window.location.href) ?
+
+const IS_DEBUG = /localhost/.test(window.location.href);
+
+const apiUrl = IS_DEBUG ?
   'http://localhost:7712' :
   'https://api.remotecong.com';
 
@@ -41,7 +44,9 @@ function makeMarker(position) {
         const onMarkerClick = () => popup.open(map, marker);
         onMarkerClick();
         marker.addListener('click', onMarkerClick);
-        console.log('GOOGLE GEOCODE:', results);
+        if (IS_DEBUG) {
+          console.log('GOOGLE GEOCODE:', results);
+        }
         gatherLookup(address, (str) => infoWindow.innerHTML = `${address}<br />${str}`);
       }
     }
@@ -58,7 +63,9 @@ function gatherLookup(addr, callback) {
   return fetch(`${apiUrl}/?address=${encodeURIComponent(addr)}`)
     .then((response) => response.ok && response.json())
     .then((data) => {
-      console.log('GATHER', data);
+      if (IS_DEBUG) {
+        console.log('GATHER:', data);
+      }
       if (data.error) {
         throw new Error(data.error);
       }
@@ -71,13 +78,13 @@ function gatherLookup(addr, callback) {
       const html = displayPhones.length ?
         displayPhones.reduce((str, phone) => {
           return str + `<li title="${phone.type}">${phone.number}</li>`;
-        }, '<ul>') + '</ul>' :
+        }) :
         '<p>No phone numbers found</p>';
 
       callback(`<p style="font-weight: bold;">${name}</p>${html}`);
     })
     .catch((err) => {
-      console.error('GATHER ERR', err);
+      console.error('GATHER ERR:', err);
       callback('FAILED TO LOOKUP! SEE LOGS');
     });
 }
