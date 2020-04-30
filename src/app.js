@@ -63,30 +63,18 @@ function gatherLookup(addr, callback) {
         throw new Error(data.error);
       }
 
-      const { phones, livesThere, ownerName } = data;
+      const { phones, orCurrentResident, name } = data;
 
-      const name = livesThere ?
-        ownerName :
-        (phones.length ?
-          `${phones[0].name} or <em>Current Resident</em>` :
-          "Current Resident");
-
-      const lastName = getLastName(name);
-
-      const displayPhones = phones.filter(({ name }) => {
-        if (livesThere) {
-          return true;
-        }
-        return lastName === getLastName(name);
-      });
+      const displayName = name + (orCurrentResident ? ' or <em>Current Resident</em>' : '');
+      const displayPhones = phones;
 
       const html = displayPhones.length ?
         displayPhones.reduce((str, phone) => {
-          return str + `<li title="${phone.isMobile ? 'Mobile' : 'Landline'}">${phone.number}</li>`;
+          return str + `<li title="${phone.type}">${phone.number}</li>`;
         }, '<ul>') + '</ul>' :
         '<p>No phone numbers found</p>';
 
-      callback(`<p style="font-weight: bold;" title="${data.ownerName}">${name}</p>${html}`);
+      callback(`<p style="font-weight: bold;">${name}</p>${html}`);
     })
     .catch((err) => {
       console.error('GATHER ERR', err);
