@@ -44,9 +44,11 @@ function makeMarker(position) {
         const onMarkerClick = () => popup.open(map, marker);
         onMarkerClick();
         marker.addListener('click', onMarkerClick);
+
         if (IS_DEBUG) {
           console.log('GOOGLE GEOCODE:', results);
         }
+
         gatherLookup(address, (str) => infoWindow.innerHTML = `${address}<br />${str}`);
       }
     }
@@ -66,6 +68,7 @@ function gatherLookup(addr, callback) {
       if (IS_DEBUG) {
         console.log('GATHER:', data);
       }
+
       if (data.error) {
         throw new Error(data.error);
       }
