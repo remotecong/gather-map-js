@@ -58,7 +58,7 @@ function gatherLookup(addr, callback) {
   return fetch(`${apiUrl}/?address=${encodeURIComponent(addr)}`)
     .then((response) => response.ok && response.json())
     .then((data) => {
-      console.log('GATHER:', data);
+      console.log('GATHER', data);
       if (data.error) {
         throw new Error(data.error);
       }
@@ -89,7 +89,7 @@ function gatherLookup(addr, callback) {
       callback(`<p style="font-weight: bold;" title="${data.ownerName}">${name}</p>${html}`);
     })
     .catch((err) => {
-      console.error('GATHER ERR:', err);
+      console.error('GATHER ERR', err);
       callback('FAILED TO LOOKUP! SEE LOGS');
     });
 }
