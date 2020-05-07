@@ -55,9 +55,7 @@ function makeMarker(position) {
 
         gatherLookup(address, infos => {
           if (Array.isArray(infos)) {
-            infoWindow.innerHTML = copyableInput(
-              [address].concat(infos).join("\t")
-            );
+            infoWindow.innerHTML = copyableInput(infos.join("\t"));
           } else {
             infoWindow.innerHTML = "";
             infoWindow.appendChild(infos);
@@ -98,7 +96,7 @@ function gatherLookup(addr, callback, tries = 1) {
         ? phones.map(({ number }) => number).join(", ")
         : "No number found";
 
-      callback([displayName, displayPhones]);
+      callback([displayName, addr, displayPhones]);
     })
     .catch(err => {
       console.error("GATHER ERR:", err);
