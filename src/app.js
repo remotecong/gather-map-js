@@ -40,8 +40,7 @@ function makeMarker(position) {
     if (status === "OK") {
       if (results[0]) {
         const address = getGatherableAddress(results[0]);
-        const addressInput = copyableInput(address);
-        infoWindow.innerHTML = `${addressInput}<br /><img style="width:40px;display:block;margin:auto;" src="/loading.gif" />`;
+        infoWindow.innerHTML = `<strong>${address}</strong><br /><img style="width:40px;display:block;margin:auto;" src="/loading.gif" />`;
         const popup = new google.maps.InfoWindow({
           content: infoWindow
         });
@@ -94,7 +93,7 @@ function gatherLookup(addr, callback, tries = 1) {
         name + (orCurrentResident ? " or Current Resident" : "");
       const displayPhones = phones.length
         ? phones.map(({ number }) => number).join(", ")
-        : "No number found";
+        : "No Number Found";
 
       callback([displayName, addr, displayPhones]);
     })
