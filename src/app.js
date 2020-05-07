@@ -36,8 +36,9 @@ function makeMarker(position) {
   geocode.geocode({location: position}, function(results, status) {
     if (status === 'OK') {
       if (results[0]) {
-        let address = getGatherableAddress(results[0]);
-        infoWindow.innerHTML = `${address}<br /><img style="width:40px;display:block;margin:auto;" src="/loading.gif" />`;
+        const address = getGatherableAddress(results[0]);
+        const addressInput = copyableInput(address);
+        infoWindow.innerHTML = `${addressInput}<br /><img style="width:40px;display:block;margin:auto;" src="/loading.gif" />`;
         const popup = new google.maps.InfoWindow({
           content: infoWindow
         });
@@ -49,7 +50,7 @@ function makeMarker(position) {
           console.log('GOOGLE GEOCODE:', results);
         }
 
-        gatherLookup(address, (str) => infoWindow.innerHTML = `${address}<br />${str}`);
+        gatherLookup(address, (str) => infoWindow.innerHTML = `${addressInput}<br />${str}`);
       }
     }
   });
@@ -59,6 +60,10 @@ function makeMarker(position) {
 
 function getLastName(name) {
   return name.replace(" or <em>Current Resident</em>", "").split(" ").pop();
+}
+
+function copyableInput(val) {
+  return `<input type="text" value="${val}" onFocus="this.select();" />`;
 }
 
 function gatherLookup(addr, callback) {
@@ -73,18 +78,13 @@ function gatherLookup(addr, callback) {
         throw new Error(data.error);
       }
 
+
       const { phones, orCurrentResident, name } = data;
 
-      const displayName = name + (orCurrentResident ? ' or <em>Current Resident</em>' : '');
-      const displayPhones = phones;
+      const displayName = copyableInput(name + (orCurrentResident ? ' or <em>Current Resident</em>' : ''));
+      const displayPhones = copyableInput(phones.length ? phones.map(({ number }) => number).join(', ') : 'No number found');
 
-      const html = displayPhones.length ?
-        displayPhones.reduce((str, phone) => {
-          return str + `<li title="${phone.type}">${phone.number}</li>`;
-        }, '') :
-        '<p>No phone numbers found</p>';
-
-      callback(`<p style="font-weight: bold;">${name}</p>${html}`);
+      callback(`${displayName}<br>${displayPhones}`);
     })
     .catch((err) => {
       console.error('GATHER ERR:', err);
