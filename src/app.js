@@ -2,10 +2,13 @@ const markers = [];
 let map, currentLocation, geocode;
 
 const IS_DEBUG = /localhost/.test(window.location.href);
+const IS_STAGE = window.location.host.endsWith("netlify.app");
 
 const apiUrl = IS_DEBUG
   ? "http://localhost:7712"
-  : "https://stage-api.remotecong.com";
+  : IS_STAGE
+  ? "https://stage-api.remotecong.com"
+  : "https://api.remotecong.com";
 
 function initMap() {
   map = new google.maps.Map(document.getElementById("map"), getMapState());
@@ -50,10 +53,16 @@ function makeMarker(position) {
           console.log("GOOGLE GEOCODE:", results);
         }
 
-        gatherLookup(
-          address,
-          str => (infoWindow.innerHTML = `${addressInput}<br />${str}`)
-        );
+        gatherLookup(address, infos => {
+          if (Array.isArray(infos)) {
+            infoWindow.innerHTML = copyableInput(
+              [address].concat(infos).join("\t")
+            );
+          } else {
+            infoWindow.innerHTML = "";
+            infoWindow.appendChild(infos);
+          }
+        });
       }
     }
   });
@@ -62,14 +71,14 @@ function makeMarker(position) {
 }
 
 function getLastName(name) {
-  return name.replace(" or <em>Current Resident</em>", "").split(" ").pop();
+  return name.replace(" or Current Resident", "").split(" ").pop();
 }
 
 function copyableInput(val) {
   return `<input type="text" value="${val}" onFocus="this.select();" />`;
 }
 
-function gatherLookup(addr, callback) {
+function gatherLookup(addr, callback, tries = 1) {
   return fetch(`${apiUrl}/?address=${encodeURIComponent(addr)}`)
     .then(response => response.ok && response.json())
     .then(data => {
@@ -83,20 +92,36 @@ function gatherLookup(addr, callback) {
 
       const { phones, orCurrentResident, name } = data;
 
-      const displayName = copyableInput(
-        name + (orCurrentResident ? " or <em>Current Resident</em>" : "")
-      );
-      const displayPhones = copyableInput(
-        phones.length
-          ? phones.map(({ number }) => number).join(", ")
-          : "No number found"
-      );
+      const displayName =
+        name + (orCurrentResident ? " or Current Resident" : "");
+      const displayPhones = phones.length
+        ? phones.map(({ number }) => number).join(", ")
+        : "No number found";
 
-      callback(`${displayName}<br>${displayPhones}`);
+      callback([displayName, displayPhones]);
     })
     .catch(err => {
       console.error("GATHER ERR:", err);
-      callback("FAILED TO LOOKUP! SEE LOGS");
+
+      const fragment = document.createDocumentFragment();
+
+      if (9 < tries) {
+        const p = document.createElement("p");
+        p.innerHTML = `Please write "Failed to lookup" in the name field for <strong>${addr}</strong> for the territory.`;
+        fragment.appendChild(p);
+        callback(fragment);
+        return;
+      }
+
+      const btn = document.createElement("button");
+      btn.textContent = `Retry ${addr}`;
+      btn.addEventListener("click", () => {
+        btn.disabled = true;
+        btn.textContent = "Retrying...";
+        gatherLookup(addr, callback, tries + 1);
+      });
+      fragment.appendChild(btn);
+      callback(fragment);
     });
 }
 
