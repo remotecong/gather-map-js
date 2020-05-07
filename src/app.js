@@ -2,54 +2,64 @@ const markers = [];
 let map, currentLocation, geocode;
 
 const IS_DEBUG = /localhost/.test(window.location.href);
+const IS_STAGE = window.location.host.endsWith("netlify.app");
 
-const apiUrl = IS_DEBUG ?
-  'http://localhost:7712' :
-  'https://api.remotecong.com';
+const apiUrl = IS_DEBUG
+  ? "http://localhost:7712"
+  : IS_STAGE
+  ? "https://stage-api.remotecong.com"
+  : "https://api.remotecong.com";
 
 function initMap() {
-  map = new google.maps.Map(document.getElementById('map'), getMapState());
+  map = new google.maps.Map(document.getElementById("map"), getMapState());
 
   geocode = new google.maps.Geocoder();
 
-  map.addListener('click', function(e) {
+  map.addListener("click", function (e) {
     markers.push(makeMarker(e.latLng));
   });
 
-  map.addListener('idle', function() {
+  map.addListener("idle", function () {
     saveMapState({
       center: map.getCenter(),
-      zoom: map.getZoom(),
+      zoom: map.getZoom()
     });
   });
 }
 
 function makeMarker(position) {
-  const infoWindow = document.createElement('div');
-  infoWindow.className = 'popup';
+  const infoWindow = document.createElement("div");
+  infoWindow.className = "popup";
 
   const marker = new google.maps.Marker({
     position,
-    map,
+    map
   });
 
-  geocode.geocode({location: position}, function(results, status) {
-    if (status === 'OK') {
+  geocode.geocode({ location: position }, function (results, status) {
+    if (status === "OK") {
       if (results[0]) {
-        let address = getGatherableAddress(results[0]);
-        infoWindow.innerHTML = `${address}<br /><img style="width:40px;display:block;margin:auto;" src="/loading.gif" />`;
+        const address = getGatherableAddress(results[0]);
+        infoWindow.innerHTML = `<strong>${address}</strong><br /><img style="width:40px;display:block;margin:auto;" src="/loading.gif" />`;
         const popup = new google.maps.InfoWindow({
           content: infoWindow
         });
         const onMarkerClick = () => popup.open(map, marker);
         onMarkerClick();
-        marker.addListener('click', onMarkerClick);
+        marker.addListener("click", onMarkerClick);
 
         if (IS_DEBUG) {
-          console.log('GOOGLE GEOCODE:', results);
+          console.log("GOOGLE GEOCODE:", results);
         }
 
-        gatherLookup(address, (str) => infoWindow.innerHTML = `${address}<br />${str}`);
+        gatherLookup(address, infos => {
+          if (Array.isArray(infos)) {
+            infoWindow.innerHTML = copyableInput(infos.join("\t"));
+          } else {
+            infoWindow.innerHTML = "";
+            infoWindow.appendChild(infos);
+          }
+        });
       }
     }
   });
@@ -58,15 +68,19 @@ function makeMarker(position) {
 }
 
 function getLastName(name) {
-  return name.replace(" or <em>Current Resident</em>", "").split(" ").pop();
+  return name.replace(" or Current Resident", "").split(" ").pop();
 }
 
-function gatherLookup(addr, callback) {
+function copyableInput(val) {
+  return `<input type="text" value="${val}" onFocus="this.select();" />`;
+}
+
+function gatherLookup(addr, callback, tries = 1) {
   return fetch(`${apiUrl}/?address=${encodeURIComponent(addr)}`)
-    .then((response) => response.ok && response.json())
-    .then((data) => {
+    .then(response => response.ok && response.json())
+    .then(data => {
       if (IS_DEBUG) {
-        console.log('GATHER:', data);
+        console.log("GATHER:", data);
       }
 
       if (data.error) {
@@ -75,23 +89,38 @@ function gatherLookup(addr, callback) {
 
       const { phones, orCurrentResident, name } = data;
 
-      const displayName = name + (orCurrentResident ? ' or <em>Current Resident</em>' : '');
-      const displayPhones = phones;
+      const displayName =
+        name + (orCurrentResident ? " or Current Resident" : "");
+      const displayPhones = phones.length
+        ? phones.map(({ number }) => number).join(", ")
+        : "No Number Found";
 
-      const html = displayPhones.length ?
-        displayPhones.reduce((str, phone) => {
-          return str + `<li title="${phone.type}">${phone.number}</li>`;
-        }, '') :
-        '<p>No phone numbers found</p>';
-
-      callback(`<p style="font-weight: bold;">${name}</p>${html}`);
+      callback([displayName, addr, displayPhones]);
     })
-    .catch((err) => {
-      console.error('GATHER ERR:', err);
-      callback('FAILED TO LOOKUP! SEE LOGS');
+    .catch(err => {
+      console.error("GATHER ERR:", err);
+
+      const fragment = document.createDocumentFragment();
+
+      if (9 < tries) {
+        const p = document.createElement("p");
+        p.innerHTML = `Please write "Failed to lookup" in the name field for <strong>${addr}</strong> for the territory.`;
+        fragment.appendChild(p);
+        callback(fragment);
+        return;
+      }
+
+      const btn = document.createElement("button");
+      btn.textContent = `Retry ${addr}`;
+      btn.addEventListener("click", () => {
+        btn.disabled = true;
+        btn.textContent = "Retrying...";
+        gatherLookup(addr, callback, tries + 1);
+      });
+      fragment.appendChild(btn);
+      callback(fragment);
     });
 }
-
 
 function getAddressComponent(components, type, useShortName = false) {
   const match = components.find(({ types }) => types.includes(type));
@@ -102,10 +131,18 @@ function getAddressComponent(components, type, useShortName = false) {
 
 function getGatherableAddress(place) {
   if (place.address_components.length) {
-    const num = getAddressComponent(place.address_components, 'street_number');
-    const street = getAddressComponent(place.address_components, 'route', true);
-    const city = getAddressComponent(place.address_components, 'locality', true);
-    const state = getAddressComponent(place.address_components, 'administrative_area_level_1', true);
+    const num = getAddressComponent(place.address_components, "street_number");
+    const street = getAddressComponent(place.address_components, "route", true);
+    const city = getAddressComponent(
+      place.address_components,
+      "locality",
+      true
+    );
+    const state = getAddressComponent(
+      place.address_components,
+      "administrative_area_level_1",
+      true
+    );
     if (num && street && city && state) {
       return `${num} ${street}, ${city}, ${state}`;
     }
@@ -113,7 +150,7 @@ function getGatherableAddress(place) {
   return place.formatted_address;
 }
 
-const LAST_KNOWN_COORDS_KEY = 'last-known-coords';
+const LAST_KNOWN_COORDS_KEY = "last-known-coords";
 
 function saveMapState(coords) {
   window.localStorage.setItem(LAST_KNOWN_COORDS_KEY, JSON.stringify(coords));
@@ -125,7 +162,9 @@ function getMapState() {
     if (str) {
       return JSON.parse(str);
     }
-  } catch(ignore) {
-  }
-  return {"center":{"lat":36.11311811576981,"lng":264.12948609197935},"zoom":12};
+  } catch (ignore) {}
+  return {
+    center: { lat: 36.11311811576981, lng: 264.12948609197935 },
+    zoom: 12
+  };
 }
