@@ -1,10 +1,10 @@
 const markers = [];
 let map, currentLocation, geocode;
 
-const IS_DEBUG = /localhost/.test(window.location.href);
+window.IS_DEBUG = /localhost/.test(window.location.href);
 const IS_STAGE = window.location.host.endsWith("netlify.app");
 
-const apiUrl = IS_DEBUG
+const apiUrl = window.IS_DEBUG
   ? "http://localhost:7712"
   : IS_STAGE
   ? "https://stage-api.remotecong.com"
@@ -29,6 +29,7 @@ function initMap() {
 
 function makeMarker(position) {
   const infoWindow = document.createElement("div");
+  const markerData = {};
   infoWindow.className = "popup";
 
   const marker = new google.maps.Marker({
@@ -36,11 +37,25 @@ function makeMarker(position) {
     map
   });
 
+  function replaceContents(node) {
+    while (infoWindow.firstChild) {
+      infoWindow.removeChild(infoWindow.firstChild);
+    }
+    infoWindow.appendChild(node);
+  }
+
+  function showLoading() {
+    if (marker.address) {
+      infoWindow.innerHTML = `<strong>${marker.address}</strong><br /><img style="width:40px;display:block;margin:auto;" src="/loading.gif" />`;
+    }
+  }
+
   geocode.geocode({ location: position }, function (results, status) {
     if (status === "OK") {
       if (results[0]) {
         const address = getGatherableAddress(results[0]);
-        infoWindow.innerHTML = `<strong>${address}</strong><br /><img style="width:40px;display:block;margin:auto;" src="/loading.gif" />`;
+        //  save address for reuse
+        marker.address = address;
         const popup = new google.maps.InfoWindow({
           content: infoWindow
         });
@@ -48,18 +63,22 @@ function makeMarker(position) {
         onMarkerClick();
         marker.addListener("click", onMarkerClick);
 
-        if (IS_DEBUG) {
+        if (window.IS_DEBUG) {
           console.log("GOOGLE GEOCODE:", results);
         }
 
-        gatherLookup(address, infos => {
-          if (Array.isArray(infos)) {
-            infoWindow.innerHTML = copyableInput(infos.join("\t"));
-          } else {
-            infoWindow.innerHTML = "";
-            infoWindow.appendChild(infos);
-          }
-        });
+        gatherLookup(
+          address,
+          infos => {
+            if (Array.isArray(infos)) {
+              replaceContents(copyableInput(infos.join("\t")));
+            } else {
+              replaceContents(infos);
+            }
+          },
+          1,
+          showLoading
+        );
       }
     }
   });
@@ -67,19 +86,21 @@ function makeMarker(position) {
   return marker;
 }
 
-function getLastName(name) {
-  return name.replace(" or Current Resident", "").split(" ").pop();
-}
-
 function copyableInput(val) {
-  return `<input type="text" value="${val}" onFocus="this.select();" />`;
+  const input = document.createElement("input");
+  input.addEventListener("focus", function () {
+    this.select();
+  });
+  input.value = val;
+  return input;
 }
 
-function gatherLookup(addr, callback, tries = 1) {
+function gatherLookup(addr, callback, tries, loadingFn) {
+  loadingFn();
   return fetch(`${apiUrl}/?address=${encodeURIComponent(addr)}`)
     .then(response => response.ok && response.json())
     .then(data => {
-      if (IS_DEBUG) {
+      if (window.IS_DEBUG) {
         console.log("GATHER:", data);
       }
 
@@ -100,6 +121,18 @@ function gatherLookup(addr, callback, tries = 1) {
     .catch(err => {
       console.error("GATHER ERR:", err);
 
+      if (err.message === "timeout error") {
+        const waitingTime = Math.random() * 5000 + 5000;
+        if (window.IS_DEBUG) {
+          console.log("TIMED OUT, WAITING", waitingTime);
+        }
+        setTimeout(
+          () => gatherLookup(addr, callback, tries + 1, loadingFn),
+          waitingTime
+        );
+        return;
+      }
+
       const fragment = document.createDocumentFragment();
 
       if (9 < tries) {
@@ -115,7 +148,7 @@ function gatherLookup(addr, callback, tries = 1) {
       btn.addEventListener("click", () => {
         btn.disabled = true;
         btn.textContent = "Retrying...";
-        gatherLookup(addr, callback, tries + 1);
+        gatherLookup(addr, callback, tries + 1, loadingFn);
       });
       fragment.appendChild(btn);
       callback(fragment);
