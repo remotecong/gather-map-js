@@ -1,0 +1,10 @@
+version: '2'
+
+services:
+  ui:
+    image: nginx:alpine
+    container_name: gather_ui
+    volumes:
+      - ./src/:/usr/share/nginx/html
+    ports:
+      - 7713:80
