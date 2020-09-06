@@ -22,7 +22,7 @@ function initMap() {
   map.addListener("idle", function () {
     saveMapState({
       center: map.getCenter(),
-      zoom: map.getZoom(),
+      zoom: map.getZoom()
     });
   });
 }
@@ -33,7 +33,7 @@ function makeMarker(position) {
 
   const marker = new google.maps.Marker({
     position,
-    map,
+    map
   });
 
   geocode.geocode({ location: position }, function (results, status) {
@@ -42,7 +42,7 @@ function makeMarker(position) {
         const address = getGatherableAddress(results[0]);
         infoWindow.innerHTML = `<strong>${address}</strong><br /><img style="width:40px;display:block;margin:auto;" src="/loading.gif" />`;
         const popup = new google.maps.InfoWindow({
-          content: infoWindow,
+          content: infoWindow
         });
         const onMarkerClick = () => popup.open(map, marker);
         onMarkerClick();
@@ -52,15 +52,21 @@ function makeMarker(position) {
           console.log("GOOGLE GEOCODE:", results);
         }
 
-        gatherLookup(address, (infos) => {
+        gatherLookup(address, infos => {
           if (Array.isArray(infos)) {
-            const [displayName, addr, displayPhones] = infos;
+            const [displayName, addr, displayPhones, thatsThemUrl] = infos;
             let html = `<strong>${addr}</strong><br>`;
             html += `<span>${displayName}</span><br>`;
-            if (displayPhones) {
+            //  if no results, tell user to doublecheck themselves: in case rate limit hit server
+            if (thatsThemUrl) {
+              html += `<a href="${thatsThemUrl}" target="_blank">click here to find number for <strong>${displayName}</strong></a><br>`;
+            } else if (displayPhones) {
               html += `<em>${displayPhones}</em><br>`;
             }
-            infoWindow.innerHTML = html + "<br><em>Copyable Data</em><br>" + copyableInput(infos.join("\t"));
+            infoWindow.innerHTML =
+              html +
+              "<br><em>Copyable Data</em><br>" +
+              copyableInput(infos.join("\t"));
           } else {
             infoWindow.innerHTML = "";
             infoWindow.appendChild(infos);
@@ -83,8 +89,8 @@ function copyableInput(val) {
 
 function gatherLookup(addr, callback, tries = 1) {
   return fetch(`${apiUrl}?address=${encodeURIComponent(addr)}`)
-    .then((response) => response.ok && response.json())
-    .then((data) => {
+    .then(response => response.ok && response.json())
+    .then(data => {
       if (IS_DEBUG) {
         console.log("GATHER:", data);
       }
@@ -93,14 +99,22 @@ function gatherLookup(addr, callback, tries = 1) {
         throw new Error(data.error);
       }
 
-      const { phones, orCurrentResident, name } = data;
+      const { phones, orCurrentResident, name, thatsThemUrl } = data;
 
-      const displayName = name + (orCurrentResident ? " or Current Resident" : "");
-      const displayPhones = phones.length ? phones.map(({ number }) => number).join(", ") : "No Number Found";
+      const displayName =
+        name + (orCurrentResident ? " or Current Resident" : "");
+      const displayPhones = phones.length
+        ? phones.map(({ number }) => number).join(", ")
+        : "No Number Found";
 
-      callback([displayName, addr, displayPhones]);
+      callback([
+        displayName,
+        addr,
+        displayPhones,
+        0 === phones.length ? thatsThemUrl : null
+      ]);
     })
-    .catch((err) => {
+    .catch(err => {
       console.error("GATHER ERR:", err);
 
       const fragment = document.createDocumentFragment();
@@ -136,8 +150,16 @@ function getGatherableAddress(place) {
   if (place.address_components.length) {
     const num = getAddressComponent(place.address_components, "street_number");
     const street = getAddressComponent(place.address_components, "route", true);
-    const city = getAddressComponent(place.address_components, "locality", true);
-    const state = getAddressComponent(place.address_components, "administrative_area_level_1", true);
+    const city = getAddressComponent(
+      place.address_components,
+      "locality",
+      true
+    );
+    const state = getAddressComponent(
+      place.address_components,
+      "administrative_area_level_1",
+      true
+    );
     if (num && street && city && state) {
       return `${num} ${street}, ${city}, ${state}`;
     }
@@ -160,6 +182,6 @@ function getMapState() {
   } catch (ignore) {}
   return {
     center: { lat: 36.11311811576981, lng: 264.12948609197935 },
-    zoom: 12,
+    zoom: 12
   };
 }
